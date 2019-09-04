@@ -23,6 +23,8 @@ try {
   asyncawait = false;
 }
 
+const bigint = typeof BigInt !== 'undefined';
+
 module.exports.addTests = function({testRunner, expect}) {
   const {describe, xdescribe, fdescribe} = testRunner;
   const {it, fit, xit, it_fails_ffox} = testRunner;
@@ -32,6 +34,10 @@ module.exports.addTests = function({testRunner, expect}) {
     it('should work', async({page, server}) => {
       const result = await page.evaluate(() => 7 * 3);
       expect(result).toBe(21);
+    });
+    (bigint ? it : xit)('should transfer BigInt', async({page, server}) => {
+      const result = await page.evaluate(a => a, BigInt(42));
+      expect(result).toBe(BigInt(42));
     });
     it('should transfer NaN', async({page, server}) => {
       const result = await page.evaluate(a => a, NaN);
@@ -79,13 +85,15 @@ module.exports.addTests = function({testRunner, expect}) {
       expect(await page.evaluate(a.sum, 1, 2)).toBe(3);
       expect(await page.evaluate(a.mult, 2, 4)).toBe(8);
     });
+    it('should work with unicode chars', async({page, server}) => {
+      const result = await page.evaluate(a => a['中文字符'], {'中文字符': 42});
+      expect(result).toBe(42);
+    });
     it('should throw when evaluation triggers reload', async({page, server}) => {
       let error = null;
       await page.evaluate(() => {
         location.reload();
-        return new Promise(resolve => {
-          setTimeout(() => resolve(1), 0);
-        });
+        return new Promise(() => {});
       }).catch(e => error = e);
       expect(error.message).toContain('Protocol error');
     });
@@ -135,6 +143,10 @@ module.exports.addTests = function({testRunner, expect}) {
       expect(result).not.toBe(object);
       expect(result).toEqual(object);
     });
+    (bigint ? it : xit)('should return BigInt', async({page, server}) => {
+      const result = await page.evaluate(() => BigInt(42));
+      expect(result).toBe(BigInt(42));
+    });
     it('should return NaN', async({page, server}) => {
       const result = await page.evaluate(() => NaN);
       expect(Object.is(result, NaN)).toBe(true);
@@ -169,6 +181,14 @@ module.exports.addTests = function({testRunner, expect}) {
         return a;
       });
       expect(result).toBe(undefined);
+    });
+    it_fails_ffox('should be able to throw a tricky error', async({page, server}) => {
+      const windowHandle = await page.evaluateHandle(() => window);
+      const errorText = await windowHandle.jsonValue().catch(e => e.message);
+      const error = await page.evaluate(errorText => {
+        throw new Error(errorText);
+      }, errorText).catch(e => e);
+      expect(error.message).toContain(errorText);
     });
     it('should accept a string', async({page, server}) => {
       const result = await page.evaluate('1 + 2');
@@ -218,6 +238,18 @@ module.exports.addTests = function({testRunner, expect}) {
       ]);
       const error = await executionContext.evaluate(() => null).catch(e => e);
       expect(error.message).toContain('navigation');
+    });
+    it_fails_ffox('should not throw an error when evaluation does a navigation', async({page, server}) => {
+      await page.goto(server.PREFIX + '/one-style.html');
+      const result = await page.evaluate(() => {
+        window.location = '/empty.html';
+        return [42];
+      });
+      expect(result).toEqual([42]);
+    });
+    it_fails_ffox('should transfer 100Mb of data from page to node.js', async({page, server}) => {
+      const a = await page.evaluate(() => Array(100 * 1024 * 1024 + 1).join('a'));
+      expect(a.length).toBe(100 * 1024 * 1024);
     });
   });
 

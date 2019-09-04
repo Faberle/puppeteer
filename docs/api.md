@@ -1,15 +1,16 @@
-# Puppeteer API <!-- GEN:version -->Tip-Of-Tree<!-- GEN:stop-->
 
-<!-- GEN:empty-if-release -->
-> Next Release: **Feb 28, 2019**
-<!-- GEN:stop -->
+# Puppeteer API <!-- GEN:version -->v1.19.0<!-- GEN:stop-->
+<!-- GEN:empty-if-release --><!-- GEN:stop -->
+
+- Interactive Documentation: https://pptr.dev
 - API Translations: [中文|Chinese](https://zhaoqize.github.io/puppeteer-api-zh_CN/#/)
+- Troubleshooting: [troubleshooting.md](https://github.com/GoogleChrome/puppeteer/blob/master/docs/troubleshooting.md)
 - Releases per Chromium Version:
+  * Chromium 77.0.3803.0 - [Puppeteer v1.18.1](https://github.com/GoogleChrome/puppeteer/blob/v1.18.0/docs/api.md)
+  * Chromium 76.0.3803.0 - [Puppeteer v1.17.0](https://github.com/GoogleChrome/puppeteer/blob/v1.17.0/docs/api.md)
+  * Chromium 75.0.3765.0 - [Puppeteer v1.15.0](https://github.com/GoogleChrome/puppeteer/blob/v1.15.0/docs/api.md)
+  * Chromium 74.0.3723.0 - [Puppeteer v1.13.0](https://github.com/GoogleChrome/puppeteer/blob/v1.13.0/docs/api.md)
   * Chromium 73.0.3679.0 - [Puppeteer v1.12.2](https://github.com/GoogleChrome/puppeteer/blob/v1.12.2/docs/api.md)
-  * Chromium 72.0.3582.0 - [Puppeteer v1.11.0](https://github.com/GoogleChrome/puppeteer/blob/v1.11.0/docs/api.md)
-  * Chromium 71.0.3563.0 - [Puppeteer v1.9.0](https://github.com/GoogleChrome/puppeteer/blob/v1.9.0/docs/api.md)
-  * Chromium 70.0.3508.0 - [Puppeteer v1.7.0](https://github.com/GoogleChrome/puppeteer/blob/v1.7.0/docs/api.md)
-  * Chromium 69.0.3494.0 - [Puppeteer v1.6.2](https://github.com/GoogleChrome/puppeteer/blob/v1.6.2/docs/api.md)
   * [All releases](https://github.com/GoogleChrome/puppeteer/releases)
 
 
@@ -19,12 +20,13 @@
 - [Overview](#overview)
 - [puppeteer vs puppeteer-core](#puppeteer-vs-puppeteer-core)
 - [Environment Variables](#environment-variables)
-- [Error handling](#error-handling)
 - [Working with Chrome Extensions](#working-with-chrome-extensions)
 - [class: Puppeteer](#class-puppeteer)
   * [puppeteer.connect(options)](#puppeteerconnectoptions)
   * [puppeteer.createBrowserFetcher([options])](#puppeteercreatebrowserfetcheroptions)
   * [puppeteer.defaultArgs([options])](#puppeteerdefaultargsoptions)
+  * [puppeteer.devices](#puppeteerdevices)
+  * [puppeteer.errors](#puppeteererrors)
   * [puppeteer.executablePath()](#puppeteerexecutablepath)
   * [puppeteer.launch([options])](#puppeteerlaunchoptions)
 - [class: BrowserFetcher](#class-browserfetcher)
@@ -44,6 +46,7 @@
   * [browser.createIncognitoBrowserContext()](#browsercreateincognitobrowsercontext)
   * [browser.defaultBrowserContext()](#browserdefaultbrowsercontext)
   * [browser.disconnect()](#browserdisconnect)
+  * [browser.isConnected()](#browserisconnected)
   * [browser.newPage()](#browsernewpage)
   * [browser.pages()](#browserpages)
   * [browser.process()](#browserprocess)
@@ -147,6 +150,7 @@
   * [page.url()](#pageurl)
   * [page.viewport()](#pageviewport)
   * [page.waitFor(selectorOrFunctionOrTimeout[, options[, ...args]])](#pagewaitforselectororfunctionortimeout-options-args)
+  * [page.waitForFileChooser([options])](#pagewaitforfilechooseroptions)
   * [page.waitForFunction(pageFunction[, options[, ...args]])](#pagewaitforfunctionpagefunction-options-args)
   * [page.waitForNavigation([options])](#pagewaitfornavigationoptions)
   * [page.waitForRequest(urlOrPredicate[, options])](#pagewaitforrequesturlorpredicate-options)
@@ -175,8 +179,12 @@
 - [class: Touchscreen](#class-touchscreen)
   * [touchscreen.tap(x, y)](#touchscreentapx-y)
 - [class: Tracing](#class-tracing)
-  * [tracing.start(options)](#tracingstartoptions)
+  * [tracing.start([options])](#tracingstartoptions)
   * [tracing.stop()](#tracingstop)
+- [class: FileChooser](#class-filechooser)
+  * [fileChooser.accept(filePaths)](#filechooseracceptfilepaths)
+  * [fileChooser.cancel()](#filechoosercancel)
+  * [fileChooser.isMultiple()](#filechooserismultiple)
 - [class: Dialog](#class-dialog)
   * [dialog.accept([promptText])](#dialogacceptprompttext)
   * [dialog.defaultValue()](#dialogdefaultvalue)
@@ -299,6 +307,7 @@
   * [target.page()](#targetpage)
   * [target.type()](#targettype)
   * [target.url()](#targeturl)
+  * [target.worker()](#targetworker)
 - [class: CDPSession](#class-cdpsession)
   * [cdpSession.detach()](#cdpsessiondetach)
   * [cdpSession.send(method[, params])](#cdpsessionsendmethod-params)
@@ -371,32 +380,6 @@ If Puppeteer doesn't find them in the environment during the installation step, 
 - `PUPPETEER_EXECUTABLE_PATH` - specify an executable path to be used in `puppeteer.launch`. See [puppeteer.launch([options])](#puppeteerlaunchoptions) on how the executable path is inferred. **BEWARE**: Puppeteer is only [guaranteed to work](https://github.com/GoogleChrome/puppeteer/#q-why-doesnt-puppeteer-vxxx-work-with-chromium-vyyy) with the bundled Chromium, use at your own risk.
 
 > **NOTE** PUPPETEER_* env variables are not accounted for in the [`puppeteer-core`](https://www.npmjs.com/package/puppeteer-core) package.
-
-### Error handling
-
-Puppeteer methods might throw errors if they are unable to fufill a request. For example, [page.waitForSelector(selector[, options])](#pagewaitforselectorselector-options)
-might fail if the selector doesn't match any nodes during the given timeframe.
-
-For certain types of errors Puppeteer uses specific error classes.
-These classes are available via `require('puppeteer/Errors')`.
-
-List of supported classes:
-- [`TimeoutError`](#class-timeouterror)
-
-An example of handling a timeout error:
-```js
-const {TimeoutError} = require('puppeteer/Errors');
-
-// ...
-
-try {
-  await page.waitForSelector('.foo');
-} catch (e) {
-  if (e instanceof TimeoutError) {
-    // Do something if this is a timeout.
-  }
-}
-```
 
 
 ### Working with Chrome Extensions
@@ -478,8 +461,55 @@ This methods attaches Puppeteer to an existing Chromium instance.
 
 The default flags that Chromium will be launched with.
 
+#### puppeteer.devices
+- returns: <[Object]>
+
+Returns a list of devices to be used with [`page.emulate(options)`](#pageemulateoptions). Actual list of
+devices can be found in [lib/DeviceDescriptors.js](https://github.com/GoogleChrome/puppeteer/blob/master/lib/DeviceDescriptors.js).
+
+```js
+const puppeteer = require('puppeteer');
+const iPhone = puppeteer.devices['iPhone 6'];
+
+puppeteer.launch().then(async browser => {
+  const page = await browser.newPage();
+  await page.emulate(iPhone);
+  await page.goto('https://www.google.com');
+  // other actions...
+  await browser.close();
+});
+```
+
+> **NOTE** The old way (Puppeteer versions <= v1.14.0) devices can be obtained with `require('puppeteer/DeviceDescriptors')`.
+
+#### puppeteer.errors
+- returns: <[Object]>
+  - `TimeoutError` <[function]> A class of [TimeoutError].
+
+Puppeteer methods might throw errors if they are unable to fufill a request. For example, [page.waitForSelector(selector[, options])](#pagewaitforselectorselector-options)
+might fail if the selector doesn't match any nodes during the given timeframe.
+
+For certain types of errors Puppeteer uses specific error classes.
+These classes are available via [`puppeteer.errors`](#puppeteererrors)
+
+An example of handling a timeout error:
+```js
+try {
+  await page.waitForSelector('.foo');
+} catch (e) {
+  if (e instanceof puppeteer.errors.TimeoutError) {
+    // Do something if this is a timeout.
+  }
+}
+```
+
+> **NOTE** The old way (Puppeteer versions <= v1.14.0) errors can be obtained with `require('puppeteer/Errors')`.
+
 #### puppeteer.executablePath()
 - returns: <[string]> A path where Puppeteer expects to find bundled Chromium. Chromium might not exist there if the download was skipped with [`PUPPETEER_SKIP_CHROMIUM_DOWNLOAD`](#environment-variables).
+
+> **NOTE** `puppeteer.executablePath()` is affected by the `PUPPETEER_EXECUTABLE_PATH` and `PUPPETEER_CHROMIUM_REVISION` env variables. See [Environment Variables](#environment-variables) for details.
+
 
 #### puppeteer.launch([options])
 - `options` <[Object]>  Set of configurable options to set on the browser. Can have the following fields:
@@ -521,7 +551,7 @@ const browser = await puppeteer.launch({
 >
 > In [puppeteer.launch([options])](#puppeteerlaunchoptions) above, any mention of Chromium also applies to Chrome.
 >
-> See [`this article`](https://www.howtogeek.com/202825/what%E2%80%99s-the-difference-between-chromium-and-chrome/) for a description of the differences between Chromium and Chrome. [`This article`](https://chromium.googlesource.com/chromium/src/+/lkcr/docs/chromium_browser_vs_google_chrome.md) describes some differences for Linux users.
+> See [`this article`](https://www.howtogeek.com/202825/what%E2%80%99s-the-difference-between-chromium-and-chrome/) for a description of the differences between Chromium and Chrome. [`This article`](https://chromium.googlesource.com/chromium/src/+/lkgr/docs/chromium_browser_vs_google_chrome.md) describes some differences for Linux users.
 
 ### class: BrowserFetcher
 
@@ -674,6 +704,12 @@ Returns the default browser context. The default browser context can not be clos
 #### browser.disconnect()
 
 Disconnects Puppeteer from the browser, but leaves the Chromium process running. After calling `disconnect`, the [Browser] object is considered disposed and cannot be used anymore.
+
+#### browser.isConnected()
+
+- returns: <[boolean]>
+
+Indicates that the browser is connected.
 
 #### browser.newPage()
 - returns: <[Promise]<[Page]>>
@@ -997,6 +1033,8 @@ In order to intercept and mutate requests, see `page.setRequestInterception`.
 
 Emitted when a request fails, for example by timing out.
 
+> **NOTE** HTTP Error responses, such as 404 or 503, are still successful responses from HTTP standpoint, so request will complete with [`'requestfinished'`](#event-requestfinished) event and not with [`'requestfailed'`](#event-requestfailed).
+
 #### event: 'requestfinished'
 - <[Request]>
 
@@ -1180,7 +1218,7 @@ Gets the full HTML contents of the page, including the doctype.
   - `httpOnly` <[boolean]>
   - `secure` <[boolean]>
   - `session` <[boolean]>
-  - `sameSite` <"Strict"|"Lax">
+  - `sameSite` <"Strict"|"Lax"|"Extended"|"None">
 
 If no URLs are specified, this method returns cookies for the current page URL.
 If URLs are specified, only cookies for those URLs are returned.
@@ -1213,12 +1251,13 @@ Emulates given device metrics and user agent. This method is a shortcut for call
 - [page.setUserAgent(userAgent)](#pagesetuseragentuseragent)
 - [page.setViewport(viewport)](#pagesetviewportviewport)
 
-To aid emulation, puppeteer provides a list of device descriptors which can be obtained via the `require('puppeteer/DeviceDescriptors')` command.
-Below is an example of emulating an iPhone 6 in puppeteer:
+To aid emulation, puppeteer provides a list of device descriptors which can be obtained via the [`puppeteer.devices`](#puppeteerdevices).
+
+`page.emulate` will resize the page. A lot of websites don't expect phones to change size, so you should emulate before navigating to the page.
+
 ```js
 const puppeteer = require('puppeteer');
-const devices = require('puppeteer/DeviceDescriptors');
-const iPhone = devices['iPhone 6'];
+const iPhone = puppeteer.devices['iPhone 6'];
 
 puppeteer.launch().then(async browser => {
   const page = await browser.newPage();
@@ -1229,7 +1268,7 @@ puppeteer.launch().then(async browser => {
 });
 ```
 
-List of all available devices is available in the source code: [DeviceDescriptors.js](https://github.com/GoogleChrome/puppeteer/blob/master/DeviceDescriptors.js).
+List of all available devices is available in the source code: [DeviceDescriptors.js](https://github.com/GoogleChrome/puppeteer/blob/master/lib/DeviceDescriptors.js).
 
 #### page.emulateMedia(mediaType)
 - `mediaType` <?[string]> Changes the CSS media type of the page. The only allowed values are `'screen'`, `'print'` and `null`. Passing `null` disables media emulation.
@@ -1242,7 +1281,7 @@ List of all available devices is available in the source code: [DeviceDescriptor
 
 If the function passed to the `page.evaluate` returns a [Promise], then `page.evaluate` would wait for the promise to resolve and return its value.
 
-If the function passed to the `page.evaluate` returns a non-[Serializable] value, then `page.evaluate` resolves to `undefined`.
+If the function passed to the `page.evaluate` returns a non-[Serializable] value, then `page.evaluate` resolves to `undefined`. DevTools Protocol also supports transferring some additional values that are not serializable by `JSON`: `-0`, `NaN`, `Infinity`, `-Infinity`, and bigint literals.
 
 Passing arguments to `pageFunction`:
 ```js
@@ -1432,13 +1471,16 @@ Navigate to the next page in history.
   - `referer` <[string]> Referer header value. If provided it will take preference over the referer header value set by [page.setExtraHTTPHeaders()](#pagesetextrahttpheadersheaders).
 - returns: <[Promise]<?[Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect.
 
-The `page.goto` will throw an error if:
+`page.goto` will throw an error if:
 - there's an SSL error (e.g. in case of self-signed certificates).
 - target URL is invalid.
 - the `timeout` is exceeded during navigation.
+- the remote server does not respond or is unreachable.
 - the main resource failed to load.
 
-> **NOTE** `page.goto` either throw or return a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+`page.goto` will not throw an error when any valid HTTP status code is returned by the remote server, including 404 "Not Found" and 500 "Internal Server Error".  The status code for such responses can be retrieved by calling [response.status()](#responsestatus).
+
+> **NOTE** `page.goto` either throws an error or returns a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
 
 > **NOTE** Headless mode doesn't support navigation to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
 
@@ -1548,8 +1590,8 @@ The `format` options are:
 - `Ledger`: 17in x 11in
 - `A0`: 33.1in x 46.8in
 - `A1`: 23.4in x 33.1in
-- `A2`: 16.5in x 23.4in
-- `A3`: 11.7in x 16.5in
+- `A2`: 16.54in x 23.4in
+- `A3`: 11.7in x 16.54in
 - `A4`: 8.27in x 11.7in
 - `A5`: 5.83in x 8.27in
 - `A6`: 4.13in x 5.83in
@@ -1688,6 +1730,7 @@ This setting will change the default maximum time for the following methods and 
 - [page.reload([options])](#pagereloadoptions)
 - [page.setContent(html[, options])](#pagesetcontenthtml-options)
 - [page.waitFor(selectorOrFunctionOrTimeout[, options[, ...args]])](#pagewaitforselectororfunctionortimeout-options-args)
+- [page.waitForFileChooser([options])](#pagewaitforfilechooseroptions)
 - [page.waitForFunction(pageFunction[, options[, ...args]])](#pagewaitforfunctionpagefunction-options-args)
 - [page.waitForNavigation([options])](#pagewaitfornavigationoptions)
 - [page.waitForRequest(urlOrPredicate[, options])](#pagewaitforrequesturlorpredicate-options)
@@ -1777,6 +1820,18 @@ puppeteer.launch().then(async browser => {
 
 In the case of multiple pages in a single browser, each page can have its own viewport size.
 
+`page.setViewport` will resize the page. A lot of websites don't expect phones to change size, so you should set the viewport before navigating to the page.
+
+```js
+const page = await browser.newPage();
+await page.setViewport({
+  width: 640,
+  height: 480,
+  deviceScaleFactor: 1,
+});
+await page.goto('https://example.com');
+```
+
 #### page.tap(selector)
 - `selector` <[string]> A [selector] to search for element to tap. If there are multiple elements satisfying the selector, the first will be tapped.
 - returns: <[Promise]>
@@ -1862,6 +1917,28 @@ await page.waitFor(selector => !!document.querySelector(selector), {}, selector)
 ```
 
 Shortcut for [page.mainFrame().waitFor(selectorOrFunctionOrTimeout[, options[, ...args]])](#framewaitforselectororfunctionortimeout-options-args).
+
+#### page.waitForFileChooser([options])
+- `options` <[Object]> Optional waiting parameters
+  - `timeout` <[number]> Maximum wait time in milliseconds, defaults to 30 seconds, pass `0` to disable the timeout. The default value can be changed by using the [page.setDefaultTimeout(timeout)](#pagesetdefaulttimeouttimeout) method.
+- returns: <[Promise]<[FileChooser]>> A promise that resolves after a page requests a file picker.
+
+> **NOTE** In non-headless Chromium, this method results in the native file picker dialog **not showing up** for the user.
+
+This method is typically coupled with an action that triggers file choosing.
+The following example clicks a button that issues a file chooser, and then
+responds with `/tmp/myfile.pdf` as if a user has selected this file.
+
+```js
+const [fileChooser] = await Promise.all([
+  page.waitForFileChooser(),
+  page.click('#upload-file-button'), // some button that triggers file selection
+]);
+await fileChooser.accept(['/tmp/myfile.pdf']);
+```
+
+> **NOTE** This must be called *before* the file chooser is launched. It will not return a currently active file chooser.
+
 
 #### page.waitForFunction(pageFunction[, options[, ...args]])
 - `pageFunction` <[function]|[string]> Function to be evaluated in browser context
@@ -2028,7 +2105,7 @@ for (const worker of page.workers())
 
 If the function passed to the `worker.evaluate` returns a [Promise], then `worker.evaluate` would wait for the promise to resolve and return its value.
 
-If the function passed to the `worker.evaluate` returns a non-[Serializable] value, then `worker.evaluate` resolves to `undefined`.
+If the function passed to the `worker.evaluate` returns a non-[Serializable] value, then `worker.evaluate` resolves to `undefined`. DevTools Protocol also supports transferring some additional values that are not serializable by `JSON`: `-0`, `NaN`, `Infinity`, `-Infinity`, and bigint literals.
 
 Shortcut for [(await worker.executionContext()).evaluate(pageFunction, ...args)](#executioncontextevaluatepagefunction-args).
 
@@ -2051,20 +2128,21 @@ Shortcut for [(await worker.executionContext()).evaluateHandle(pageFunction, ...
 
 ### class: Accessibility
 
-The Accessibility class provides methods for inspecting Chromium's accessibility tree. The accessibility tree is used by assistive technology such as [screen readers](https://en.wikipedia.org/wiki/Screen_reader).
+The Accessibility class provides methods for inspecting Chromium's accessibility tree. The accessibility tree is used by assistive technology such as [screen readers](https://en.wikipedia.org/wiki/Screen_reader) or [switches](https://en.wikipedia.org/wiki/Switch_access).
 
 Accessibility is a very platform-specific thing. On different platforms, there are different screen readers that might have wildly different output.
 
 Blink - Chrome's rendering engine - has a concept of "accessibility tree", which is than translated into different platform-specific APIs. Accessibility namespace gives users
 access to the Blink Accessibility Tree.
 
-Most of the accessibility tree gets filtered out when converting from Blink AX Tree to Platform-specific AX-Tree or by screen readers themselves. By default, Puppeteer tries to approximate this filtering, exposing only the "interesting" nodes of the tree.
+Most of the accessibility tree gets filtered out when converting from Blink AX Tree to Platform-specific AX-Tree or by assistive technologies themselves. By default, Puppeteer tries to approximate this filtering, exposing only the "interesting" nodes of the tree.
 
 
 
 #### accessibility.snapshot([options])
 - `options` <[Object]>
   - `interestingOnly` <[boolean]> Prune uninteresting nodes from the tree. Defaults to `true`.
+  - `root` <[ElementHandle]> The root DOM element for the snapshot. Defaults to the whole page.
 - returns: <[Promise]<[Object]>> An [AXNode] object with the following properties:
   - `role` <[string]> The [role](https://www.w3.org/TR/wai-aria/#usage_intro).
   - `name` <[string]> A human readable name for the node.
@@ -2287,7 +2365,7 @@ await page.goto('https://www.google.com');
 await page.tracing.stop();
 ```
 
-#### tracing.start(options)
+#### tracing.start([options])
 - `options` <[Object]>
   - `path` <[string]> A path to write the trace file to.
   - `screenshots` <[boolean]> captures screenshots in the trace.
@@ -2298,6 +2376,37 @@ Only one trace can be active at a time per browser.
 
 #### tracing.stop()
 - returns: <[Promise]<[Buffer]>> Promise which resolves to buffer with trace data.
+
+### class: FileChooser
+
+[FileChooser] objects are returned via the ['page.waitForFileChooser'](#pagewaitforfilechooseroptions) method.
+
+File choosers let you react to the page requesting for a file.
+
+An example of using [FileChooser]:
+
+```js
+const [fileChooser] = await Promise.all([
+  page.waitForFileChooser(),
+  page.click('#upload-file-button'), // some button that triggers file selection
+]);
+await fileChooser.accept(['/tmp/myfile.pdf']);
+```
+
+> **NOTE** In browsers, only one file chooser can be opened at a time.
+> All file choosers must be accepted or canceled. Not doing so will prevent subsequent file choosers from appearing.
+
+#### fileChooser.accept(filePaths)
+- `filePaths` <[Array]<[string]>> Accept the file chooser request with given paths. If some of the  `filePaths` are relative paths, then they are resolved relative to the [current working directory](https://nodejs.org/api/process.html#process_process_cwd).
+- returns: <[Promise]>
+
+#### fileChooser.cancel()
+- returns: <[Promise]>
+
+Closes the file chooser without selecting any files.
+
+#### fileChooser.isMultiple()
+- returns: <[boolean]> Whether file chooser allow for [multiple](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/file#attr-multiple) file selection.
 
 ### class: Dialog
 
@@ -2495,7 +2604,7 @@ Gets the full HTML contents of the frame, including the doctype.
 
 If the function passed to the `frame.evaluate` returns a [Promise], then `frame.evaluate` would wait for the promise to resolve and return its value.
 
-If the function passed to the `frame.evaluate` returns a non-[Serializable] value, then `frame.evaluate` resolves to `undefined`.
+If the function passed to the `frame.evaluate` returns a non-[Serializable] value, then `frame.evaluate` resolves to `undefined`. DevTools Protocol also supports transferring some additional values that are not serializable by `JSON`: `-0`, `NaN`, `Infinity`, `-Infinity`, and bigint literals.
 
 ```js
 const result = await frame.evaluate(() => {
@@ -2570,13 +2679,16 @@ If there's no element matching `selector`, the method throws an error.
   - `referer` <[string]> Referer header value. If provided it will take preference over the referer header value set by [page.setExtraHTTPHeaders()](#pagesetextrahttpheadersheaders).
 - returns: <[Promise]<?[Response]>> Promise which resolves to the main resource response. In case of multiple redirects, the navigation will resolve with the response of the last redirect.
 
-The `frame.goto` will throw an error if:
+`frame.goto` will throw an error if:
 - there's an SSL error (e.g. in case of self-signed certificates).
 - target URL is invalid.
 - the `timeout` is exceeded during navigation.
+- the remote server does not respond or is unreachable.
 - the main resource failed to load.
 
-> **NOTE** `frame.goto` either throw or return a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+`frame.goto` will not throw an error when any valid HTTP status code is returned by the remote server, including 404 "Not Found" and 500 "Internal Server Error".  The status code for such responses can be retrieved by calling [response.status()](#responsestatus).
+
+> **NOTE** `frame.goto` either throws an error or returns a main resource response. The only exceptions are navigation to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
 
 > **NOTE** Headless mode doesn't support navigation to a PDF document. See the [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
 
@@ -2814,6 +2926,8 @@ Besides pages, execution contexts can be found in [workers](https://developer.mo
 
 If the function passed to the `executionContext.evaluate` returns a [Promise], then `executionContext.evaluate` would wait for the promise to resolve and return its value.
 
+If the function passed to the `executionContext.evaluate` returns a non-[Serializable] value, then `executionContext.evaluate` resolves to `undefined`. DevTools Protocol also supports transferring some additional values that are not serializable by `JSON`: `-0`, `NaN`, `Infinity`, `-Infinity`, and bigint literals.
+
 ```js
 const executionContext = await page.mainFrame().executionContext();
 const result = await executionContext.evaluate(() => Promise.resolve(8 * 7));
@@ -2957,9 +3071,9 @@ const puppeteer = require('puppeteer');
 
 puppeteer.launch().then(async browser => {
   const page = await browser.newPage();
-  await page.goto('https://google.com');
-  const inputElement = await page.$('input[type=submit]');
-  await inputElement.click();
+  await page.goto('https://example.com');
+  const hrefElement = await page.$('a');
+  await hrefElement.click();
   // ...
 });
 ```
@@ -3173,7 +3287,7 @@ await elementHandle.press('Enter');
 ```
 
 #### elementHandle.uploadFile(...filePaths)
-- `...filePaths` <...[string]> Sets the value of the file input these paths. If some of the  `filePaths` are relative paths, then they are resolved relative to [current working directory](https://nodejs.org/api/process.html#process_process_cwd).
+- `...filePaths` <...[string]> Sets the value of the file input to these paths. If some of the  `filePaths` are relative paths, then they are resolved relative to the [current working directory](https://nodejs.org/api/process.html#process_process_cwd).
 - returns: <[Promise]>
 
 This method expects `elementHandle` to point to an [input element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input).
@@ -3181,11 +3295,13 @@ This method expects `elementHandle` to point to an [input element](https://devel
 ### class: Request
 
 Whenever the page sends a request, such as for a network resource, the following events are emitted by puppeteer's page:
-- ['request'](#event-request) emitted when the request is issued by the page.
-- ['response'](#event-response) emitted when/if the response is received for the request.
-- ['requestfinished'](#event-requestfinished) emitted when the response body is downloaded and the request is complete.
+- [`'request'`](#event-request) emitted when the request is issued by the page.
+- [`'response'`](#event-response) emitted when/if the response is received for the request.
+- [`'requestfinished'`](#event-requestfinished) emitted when the response body is downloaded and the request is complete.
 
-If request fails at some point, then instead of 'requestfinished' event (and possibly instead of 'response' event), the  ['requestfailed'](#event-requestfailed) event is emitted.
+If request fails at some point, then instead of `'requestfinished'` event (and possibly instead of 'response' event), the  [`'requestfailed'`](#event-requestfailed) event is emitted.
+
+> **NOTE** HTTP Error responses, such as 404 or 503, are still successful responses from HTTP standpoint, so request will complete with `'requestfinished'` event.
 
 If request gets a 'redirect' response, the request is successfully finished with the 'requestfinished' event, and a new request is  issued to a redirected url.
 
@@ -3214,10 +3330,10 @@ Exception is immediately thrown if the request interception is not enabled.
 
 #### request.continue([overrides])
 - `overrides` <[Object]> Optional request overwrites, which can be one of the following:
-  - `url` <[string]> If set, the request url will be changed
+  - `url` <[string]> If set, the request url will be changed. This is not a redirect. The request will be silently forwarded to the new url. For example, the address bar will show the original url.
   - `method` <[string]> If set changes the request method (e.g. `GET` or `POST`)
   - `postData` <[string]> If set changes the post data of request
-  - `headers` <[Object]> If set changes the request HTTP headers
+  - `headers` <[Object]> If set changes the request HTTP headers. Header values will be converted to a string.
 - returns: <[Promise]>
 
 Continues request with optional request overrides. To use this, request interception should be enabled with `page.setRequestInterception`.
@@ -3303,7 +3419,7 @@ ResourceType will be one of the following: `document`, `stylesheet`, `image`, `m
 #### request.respond(response)
 - `response` <[Object]> Response that will fulfill this request
   - `status` <[number]> Response status code, defaults to `200`.
-  - `headers` <[Object]> Optional response headers
+  - `headers` <[Object]> Optional response headers. Header values will be converted to a string.
   - `contentType` <[string]> If set, equals to setting `Content-Type` response header
   - `body` <[string]|[Buffer]> Optional response body
 - returns: <[Promise]>
@@ -3445,12 +3561,17 @@ Get the target that opened this target. Top-level targets return `null`.
 If the target is not of type `"page"` or `"background_page"`, returns `null`.
 
 #### target.type()
-- returns: <"page"|"background_page"|"service_worker"|"other"|"browser">
+- returns: <"page"|"background_page"|"service_worker"|"shared_worker"|"other"|"browser">
 
-Identifies what kind of target this is. Can be `"page"`, [`"background_page"`](https://developer.chrome.com/extensions/background_pages), `"service_worker"`, `"browser"` or `"other"`.
+Identifies what kind of target this is. Can be `"page"`, [`"background_page"`](https://developer.chrome.com/extensions/background_pages), `"service_worker"`, `"shared_worker"`, `"browser"` or `"other"`.
 
 #### target.url()
 - returns: <[string]>
+
+#### target.worker()
+- returns: <[Promise]<?[Worker]>>
+
+If the target is not of type `"service_worker"` or `"shared_worker"`, returns `null`.
 
 ### class: CDPSession
 
@@ -3460,7 +3581,9 @@ The `CDPSession` instances are used to talk raw Chrome Devtools Protocol:
 - protocol methods can be called with `session.send` method.
 - protocol events can be subscribed to with `session.on` method.
 
-Documentation on DevTools Protocol can be found here: [DevTools Protocol Viewer](https://chromedevtools.github.io/devtools-protocol/).
+Useful links:
+- Documentation on DevTools Protocol can be found here: [DevTools Protocol Viewer](https://chromedevtools.github.io/devtools-protocol/).
+- Getting Started with DevTools Protocol: https://github.com/aslushnikov/getting-started-with-cdp/blob/master/README.md
 
 ```js
 const client = await page.target().createCDPSession();
@@ -3560,49 +3683,51 @@ TimeoutError is emitted whenever certain operations are terminated due to timeou
 
 
 
+[AXNode]: #accessibilitysnapshotoptions "AXNode"
+[Accessibility]: #class-accessibility "Accessibility"
 [Array]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array "Array"
-[boolean]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Boolean_type "Boolean"
+[Body]: #class-body  "Body"
+[BrowserContext]: #class-browsercontext  "BrowserContext"
+[BrowserFetcher]: #class-browserfetcher  "BrowserFetcher"
+[Browser]: #class-browser  "Browser"
 [Buffer]: https://nodejs.org/api/buffer.html#buffer_class_buffer "Buffer"
-[function]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function "Function"
-[number]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Number_type "Number"
+[CDPSession]: #class-cdpsession  "CDPSession"
+[ChildProcess]: https://nodejs.org/api/child_process.html "ChildProcess"
+[ConnectionTransport]: ../lib/WebSocketTransport.js "ConnectionTransport"
+[ConsoleMessage]: #class-consolemessage "ConsoleMessage"
+[Coverage]: #class-coverage "Coverage"
+[Dialog]: #class-dialog "Dialog"
+[ElementHandle]: #class-elementhandle "ElementHandle"
+[Element]: https://developer.mozilla.org/en-US/docs/Web/API/element "Element"
+[Error]: https://nodejs.org/api/errors.html#errors_class_error "Error"
+[ExecutionContext]: #class-executioncontext "ExecutionContext"
+[FileChooser]: #class-filechooser "FileChooser"
+[Frame]: #class-frame "Frame"
+[JSHandle]: #class-jshandle "JSHandle"
+[Keyboard]: #class-keyboard "Keyboard"
+[Map]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map "Map"
+[Mouse]: #class-mouse "Mouse"
 [Object]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object "Object"
-[origin]: https://developer.mozilla.org/en-US/docs/Glossary/Origin "Origin"
 [Page]: #class-page "Page"
 [Promise]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise "Promise"
-[string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#String_type "String"
-[stream.Readable]: https://nodejs.org/api/stream.html#stream_class_stream_readable "stream.Readable"
-[CDPSession]: #class-cdpsession  "CDPSession"
-[BrowserFetcher]: #class-browserfetcher  "BrowserFetcher"
-[BrowserContext]: #class-browsercontext  "BrowserContext"
-[Error]: https://nodejs.org/api/errors.html#errors_class_error "Error"
-[Frame]: #class-frame "Frame"
-[ConsoleMessage]: #class-consolemessage "ConsoleMessage"
-[ChildProcess]: https://nodejs.org/api/child_process.html "ChildProcess"
-[Coverage]: #class-coverage "Coverage"
-[iterator]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols "Iterator"
-[Response]: #class-response  "Response"
 [Request]: #class-request  "Request"
-[Browser]: #class-browser  "Browser"
-[Body]: #class-body  "Body"
-[Element]: https://developer.mozilla.org/en-US/docs/Web/API/element "Element"
-[Keyboard]: #class-keyboard "Keyboard"
-[Dialog]: #class-dialog  "Dialog"
-[JSHandle]: #class-jshandle "JSHandle"
-[ExecutionContext]: #class-executioncontext "ExecutionContext"
-[Mouse]: #class-mouse "Mouse"
-[Map]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map "Map"
-[selector]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors "selector"
-[Tracing]: #class-tracing "Tracing"
-[ElementHandle]: #class-elementhandle "ElementHandle"
-[UIEvent.detail]: https://developer.mozilla.org/en-US/docs/Web/API/UIEvent/detail "UIEvent.detail"
-[Serializable]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#Description "Serializable"
-[Touchscreen]: #class-touchscreen "Touchscreen"
-[Target]: #class-target "Target"
-[USKeyboardLayout]: ../lib/USKeyboardLayout.js "USKeyboardLayout"
-[xpath]: https://developer.mozilla.org/en-US/docs/Web/XPath "xpath"
-[UnixTime]: https://en.wikipedia.org/wiki/Unix_time "Unix Time"
+[Response]: #class-response  "Response"
 [SecurityDetails]: #class-securitydetails "SecurityDetails"
+[Serializable]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#Description "Serializable"
+[Target]: #class-target "Target"
+[TimeoutError]: #class-timeouterror "TimeoutError"
+[Touchscreen]: #class-touchscreen "Touchscreen"
+[Tracing]: #class-tracing "Tracing"
+[UIEvent.detail]: https://developer.mozilla.org/en-US/docs/Web/API/UIEvent/detail "UIEvent.detail"
+[USKeyboardLayout]: ../lib/USKeyboardLayout.js "USKeyboardLayout"
+[UnixTime]: https://en.wikipedia.org/wiki/Unix_time "Unix Time"
 [Worker]: #class-worker "Worker"
-[Accessibility]: #class-accessibility "Accessibility"
-[AXNode]: #accessibilitysnapshotoptions "AXNode"
-[ConnectionTransport]: ../lib/WebSocketTransport.js "ConnectionTransport"
+[boolean]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Boolean_type "Boolean"
+[function]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function "Function"
+[iterator]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols "Iterator"
+[number]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Number_type "Number"
+[origin]: https://developer.mozilla.org/en-US/docs/Glossary/Origin "Origin"
+[selector]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors "selector"
+[stream.Readable]: https://nodejs.org/api/stream.html#stream_class_stream_readable "stream.Readable"
+[string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#String_type "String"
+[xpath]: https://developer.mozilla.org/en-US/docs/Web/XPath "xpath"

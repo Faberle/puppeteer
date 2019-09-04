@@ -25,13 +25,10 @@ try {
   asyncawait = false;
 }
 
-module.exports.addTests = function({testRunner, expect, headless, Errors, DeviceDescriptors, CHROME}) {
+module.exports.addTests = function({testRunner, expect, headless, puppeteer, CHROME}) {
   const {describe, xdescribe, fdescribe, describe_fails_ffox} = testRunner;
   const {it, fit, xit, it_fails_ffox} = testRunner;
   const {beforeAll, beforeEach, afterAll, afterEach} = testRunner;
-
-  const {TimeoutError} = Errors;
-  const iPhone = DeviceDescriptors['iPhone 6'];
 
   describe('Page.close', function() {
     it('should reject all promises when page is closed', async({context}) => {
@@ -289,6 +286,15 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       const values = await page.evaluate(objects => Array.from(objects[0].values()), objectsHandle);
       expect(values).toEqual(['hello', 'world']);
     });
+    it('should work for non-blank page', async({page, server}) => {
+      // Instantiate an object
+      await page.goto(server.EMPTY_PAGE);
+      await page.evaluate(() => window.set = new Set(['hello', 'world']));
+      const prototypeHandle = await page.evaluateHandle(() => Set.prototype);
+      const objectsHandle = await page.queryObjects(prototypeHandle);
+      const count = await page.evaluate(objects => objects.length, objectsHandle);
+      expect(count).toBe(1);
+    });
     it('should fail for disposed handles', async({page, server}) => {
       const prototypeHandle = await page.evaluateHandle(() => HTMLBodyElement.prototype);
       await prototypeHandle.dispose();
@@ -366,6 +372,8 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
         expect(message.type()).toEqual('warn');
     });
     it_fails_ffox('should have location when fetch fails', async({page, server}) => {
+      // The point of this test is to make sure that we report console messages from
+      // Log domain: https://vanilla.aslushnikov.com/?Log.entryAdded
       await page.goto(server.EMPTY_PAGE);
       const [message] = await Promise.all([
         waitEvent(page, 'console'),
@@ -485,13 +493,13 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
     it('should respect timeout', async({page, server}) => {
       let error = null;
       await page.waitForRequest(() => false, {timeout: 1}).catch(e => error = e);
-      expect(error).toBeInstanceOf(TimeoutError);
+      expect(error).toBeInstanceOf(puppeteer.errors.TimeoutError);
     });
     it('should respect default timeout', async({page, server}) => {
       let error = null;
       page.setDefaultTimeout(1);
       await page.waitForRequest(() => false).catch(e => error = e);
-      expect(error).toBeInstanceOf(TimeoutError);
+      expect(error).toBeInstanceOf(puppeteer.errors.TimeoutError);
     });
     it('should work with no timeout', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
@@ -523,13 +531,13 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
     it('should respect timeout', async({page, server}) => {
       let error = null;
       await page.waitForResponse(() => false, {timeout: 1}).catch(e => error = e);
-      expect(error).toBeInstanceOf(TimeoutError);
+      expect(error).toBeInstanceOf(puppeteer.errors.TimeoutError);
     });
     it('should respect default timeout', async({page, server}) => {
       let error = null;
       page.setDefaultTimeout(1);
       await page.waitForResponse(() => false).catch(e => error = e);
-      expect(error).toBeInstanceOf(TimeoutError);
+      expect(error).toBeInstanceOf(puppeteer.errors.TimeoutError);
     });
     it('should work with predicate', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
@@ -648,6 +656,13 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       });
       expect(result).toBe(15);
     });
+    it('should work with complex objects', async({page, server}) => {
+      await page.exposeFunction('complexObject', function(a, b) {
+        return {x: a.x + b.x};
+      });
+      const result = await page.evaluate(async() => complexObject({x: 5}, {x: 2}));
+      expect(result.x).toBe(7);
+    });
   });
 
   describe('Page.Events.PageError', function() {
@@ -684,7 +699,7 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
     it('should emulate device user-agent', async({page, server}) => {
       await page.goto(server.PREFIX + '/mobile.html');
       expect(await page.evaluate(() => navigator.userAgent)).not.toContain('iPhone');
-      await page.setUserAgent(iPhone.userAgent);
+      await page.setUserAgent(puppeteer.devices['iPhone 6'].userAgent);
       expect(await page.evaluate(() => navigator.userAgent)).toContain('iPhone');
     });
   });
@@ -715,7 +730,7 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       server.setRoute(imgPath, (req, res) => {});
       let error = null;
       await page.setContent(`<img src="${server.PREFIX + imgPath}"></img>`, {timeout: 1}).catch(e => error = e);
-      expect(error).toBeInstanceOf(TimeoutError);
+      expect(error).toBeInstanceOf(puppeteer.errors.TimeoutError);
     });
     it_fails_ffox('should respect default navigation timeout', async({page, server}) => {
       page.setDefaultNavigationTimeout(1);
@@ -724,7 +739,7 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       server.setRoute(imgPath, (req, res) => {});
       let error = null;
       await page.setContent(`<img src="${server.PREFIX + imgPath}"></img>`).catch(e => error = e);
-      expect(error).toBeInstanceOf(TimeoutError);
+      expect(error).toBeInstanceOf(puppeteer.errors.TimeoutError);
     });
     it_fails_ffox('should await resources to load', async({page, server}) => {
       const imgPath = '/img.png';
@@ -740,6 +755,22 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
     it('should work fast enough', async({page, server}) => {
       for (let i = 0; i < 20; ++i)
         await page.setContent('<div>yo</div>');
+    });
+    it('should work with tricky content', async({page, server}) => {
+      await page.setContent('<div>hello world</div>' + '\x7F');
+      expect(await page.$eval('div', div => div.textContent)).toBe('hello world');
+    });
+    it('should work with accents', async({page, server}) => {
+      await page.setContent('<div>aberración</div>');
+      expect(await page.$eval('div', div => div.textContent)).toBe('aberración');
+    });
+    it('should work with emojis', async({page, server}) => {
+      await page.setContent('<div>🐥</div>');
+      expect(await page.$eval('div', div => div.textContent)).toBe('🐥');
+    });
+    it('should work with newline', async({page, server}) => {
+      await page.setContent('<div>\n</div>');
+      expect(await page.$eval('div', div => div.textContent)).toBe('\n');
     });
   });
 
@@ -780,6 +811,25 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       await page.goto(server.CROSS_PROCESS_PREFIX + '/csp.html');
       await page.addScriptTag({content: 'window.__injected = 42;'});
       expect(await page.evaluate(() => window.__injected)).toBe(42);
+    });
+    it('should bypass CSP in iframes as well', async({page, server}) => {
+      await page.goto(server.EMPTY_PAGE);
+      {
+        // Make sure CSP prohibits addScriptTag in an iframe.
+        const frame = await utils.attachFrame(page, 'frame1', server.PREFIX + '/csp.html');
+        await frame.addScriptTag({content: 'window.__injected = 42;'}).catch(e => void e);
+        expect(await frame.evaluate(() => window.__injected)).toBe(undefined);
+      }
+
+      // By-pass CSP and try one more time.
+      await page.setBypassCSP(true);
+      await page.reload();
+
+      {
+        const frame = await utils.attachFrame(page, 'frame1', server.PREFIX + '/csp.html');
+        await frame.addScriptTag({content: 'window.__injected = 42;'}).catch(e => void e);
+        expect(await frame.evaluate(() => window.__injected)).toBe(42);
+      }
     });
   });
 
@@ -973,6 +1023,18 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       ]);
       expect(nonCachedRequest.headers['if-modified-since']).toBe(undefined);
     });
+    it('should stay disabled when toggling request interception on/off', async({page, server}) => {
+      await page.setCacheEnabled(false);
+      await page.setRequestInterception(true);
+      await page.setRequestInterception(false);
+
+      await page.goto(server.PREFIX + '/cached/one-style.html');
+      const [nonCachedRequest] = await Promise.all([
+        server.waitForRequest('/cached/one-style.html'),
+        page.reload(),
+      ]);
+      expect(nonCachedRequest.headers['if-modified-since']).toBe(undefined);
+    });
   });
 
   // Printing to pdf is currently only supported in headless
@@ -1004,6 +1066,15 @@ module.exports.addTests = function({testRunner, expect, headless, Errors, Device
       await page.select('select', 'blue', 'green', 'red');
       expect(await page.evaluate(() => result.onInput)).toEqual(['blue']);
       expect(await page.evaluate(() => result.onChange)).toEqual(['blue']);
+    });
+    it_fails_ffox('should not throw when select causes navigation', async({page, server}) => {
+      await page.goto(server.PREFIX + '/input/select.html');
+      await page.$eval('select', select => select.addEventListener('input', () => window.location = '/empty.html'));
+      await Promise.all([
+        page.select('select', 'blue'),
+        page.waitForNavigation(),
+      ]);
+      expect(page.url()).toContain('empty.html');
     });
     it('should select multiple options', async({page, server}) => {
       await page.goto(server.PREFIX + '/input/select.html');

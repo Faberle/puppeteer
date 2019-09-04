@@ -28,11 +28,12 @@ class Helper {
       if (methodName === 'constructor' || typeof methodName !== 'string' || methodName.startsWith('_') || typeof method !== 'function' || method.constructor.name !== 'AsyncFunction')
         continue;
       Reflect.set(classType.prototype, methodName, function(...args) {
-        const syncStack = new Error();
+        const syncStack = {};
+        Error.captureStackTrace(syncStack);
         return method.call(this, ...args).catch(e => {
           const stack = syncStack.stack.substring(syncStack.stack.indexOf('\n') + 1);
           const clientStack = stack.substring(stack.indexOf('\n'));
-          if (!e.stack.includes(clientStack))
+          if (e instanceof Error && e.stack && !e.stack.includes(clientStack))
             e.stack += '\n  -- ASYNC --\n' + stack;
           throw e;
         });

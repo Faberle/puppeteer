@@ -114,9 +114,6 @@ class Keyboard {
     if (this._modifiers & ~8)
       description.text = '';
 
-    // Firefox calls the 'Meta' key 'OS' on everything but mac
-    if (os.platform() !== 'darwin' && description.key === 'Meta')
-      description.key = 'OS';
     if (description.code === 'MetaLeft')
       description.code = 'OSLeft';
     if (description.code === 'MetaRight')
@@ -221,11 +218,20 @@ class Mouse {
    */
   async click(x, y, options = {}) {
     const {delay = null} = options;
-    this.move(x, y);
-    this.down(options);
-    if (delay !== null)
+    if (delay !== null) {
+      await Promise.all([
+        this.move(x, y),
+        this.down(options),
+      ]);
       await new Promise(f => setTimeout(f, delay));
-    await this.up(options);
+      await this.up(options);
+    } else {
+      await Promise.all([
+        this.move(x, y),
+        this.down(options),
+        this.up(options),
+      ]);
+    }
   }
 
   /**

@@ -16,7 +16,7 @@
 
 module.exports.addTests = function({testRunner, expect}) {
   const {describe, xdescribe, fdescribe} = testRunner;
-  const {it, fit, xit} = testRunner;
+  const {it, fit, xit, it_fails_ffox} = testRunner;
   const {beforeAll, beforeEach, afterAll, afterEach} = testRunner;
 
   describe('Page.cookies', function() {
@@ -40,6 +40,36 @@ module.exports.addTests = function({testRunner, expect}) {
         secure: false,
         session: true
       }]);
+    });
+    it('should properly report httpOnly cookie', async({page, server}) => {
+      server.setRoute('/empty.html', (req, res) => {
+        res.setHeader('Set-Cookie', ';HttpOnly; Path=/');
+        res.end();
+      });
+      await page.goto(server.EMPTY_PAGE);
+      const cookies = await page.cookies();
+      expect(cookies.length).toBe(1);
+      expect(cookies[0].httpOnly).toBe(true);
+    });
+    it_fails_ffox('should properly report "Strict" sameSite cookie', async({page, server}) => {
+      server.setRoute('/empty.html', (req, res) => {
+        res.setHeader('Set-Cookie', ';SameSite=Strict');
+        res.end();
+      });
+      await page.goto(server.EMPTY_PAGE);
+      const cookies = await page.cookies();
+      expect(cookies.length).toBe(1);
+      expect(cookies[0].sameSite).toBe('Strict');
+    });
+    it_fails_ffox('should properly report "Lax" sameSite cookie', async({page, server}) => {
+      server.setRoute('/empty.html', (req, res) => {
+        res.setHeader('Set-Cookie', ';SameSite=Lax');
+        res.end();
+      });
+      await page.goto(server.EMPTY_PAGE);
+      const cookies = await page.cookies();
+      expect(cookies.length).toBe(1);
+      expect(cookies[0].sameSite).toBe('Lax');
     });
     it('should get multiple cookies', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
@@ -260,15 +290,15 @@ module.exports.addTests = function({testRunner, expect}) {
       const [cookie] = await page.cookies(SECURE_URL);
       expect(cookie.secure).toBe(true);
     });
-    it('should be able to set unsecure cookie for HTTPS website', async({page, server}) => {
+    it('should be able to set unsecure cookie for HTTP website', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
-      const SECURE_URL = 'http://example.com';
+      const HTTP_URL = 'http://example.com';
       await page.setCookie({
-        url: SECURE_URL,
+        url: HTTP_URL,
         name: 'foo',
         value: 'bar',
       });
-      const [cookie] = await page.cookies(SECURE_URL);
+      const [cookie] = await page.cookies(HTTP_URL);
       expect(cookie.secure).toBe(false);
     });
     it('should set a cookie on a different domain', async({page, server}) => {
