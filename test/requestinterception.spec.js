@@ -60,7 +60,7 @@ module.exports.addTests = function({testRunner, expect, CHROME}) {
         page.waitForNavigation()
       ]);
     });
-    // @see https://github.com/GoogleChrome/puppeteer/issues/3973
+    // @see https://github.com/puppeteer/puppeteer/issues/3973
     it('should work when header manipulation headers with redirect', async({page, server}) => {
       server.setRedirect('/rrredirect', '/empty.html');
       await page.setRequestInterception(true);
@@ -71,6 +71,24 @@ module.exports.addTests = function({testRunner, expect, CHROME}) {
         request.continue({ headers });
       });
       await page.goto(server.PREFIX + '/rrredirect');
+    });
+    // @see https://github.com/puppeteer/puppeteer/issues/4743
+    it('should be able to remove headers', async({page, server}) => {
+      await page.setRequestInterception(true);
+      page.on('request', request => {
+        const headers = Object.assign({}, request.headers(), {
+          foo: 'bar',
+          origin: undefined, // remove "origin" header
+        });
+        request.continue({ headers });
+      });
+
+      const [serverRequest] = await Promise.all([
+        server.waitForRequest('/empty.html'),
+        page.goto(server.PREFIX + '/empty.html')
+      ]);
+
+      expect(serverRequest.headers.origin).toBe(undefined);
     });
     it('should contain referer header', async({page, server}) => {
       await page.setRequestInterception(true);
@@ -114,8 +132,8 @@ module.exports.addTests = function({testRunner, expect, CHROME}) {
       const response = await page.goto(server.EMPTY_PAGE);
       expect(response.ok()).toBe(true);
     });
-    // @see https://github.com/GoogleChrome/puppeteer/issues/4337
-    xit('should work with redirect inside sync XHR', async({page, server}) => {
+    // @see https://github.com/puppeteer/puppeteer/issues/4337
+    it('should work with redirect inside sync XHR', async({page, server}) => {
       await page.goto(server.EMPTY_PAGE);
       server.setRedirect('/logo.png', '/pptr.png');
       await page.setRequestInterception(true);
@@ -128,7 +146,7 @@ module.exports.addTests = function({testRunner, expect, CHROME}) {
       });
       expect(status).toBe(200);
     });
-    it('should works with customizing referer headers', async({page, server}) => {
+    it('should work with custom referer headers', async({page, server}) => {
       await page.setExtraHTTPHeaders({ 'referer': server.EMPTY_PAGE });
       await page.setRequestInterception(true);
       page.on('request', request => {

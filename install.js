@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-// puppeteer-core should not install anything.
-if (require('./package.json').name === 'puppeteer-core')
-  return;
-
-buildNode6IfNecessary();
-
+/**
+ * This file is part of public API.
+ *
+ * By default, the `puppeteer` package runs this script during the installation
+ * process unless one of the env flags is provided.
+ * `puppeteer-core` package doesn't include this step at all. However, it's
+ * still possible to install Chromium using this script when necessary.
+ */
 if (process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD) {
   logPolitely('**INFO** Skipping Chromium download. "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD" environment variable was found.');
   return;
@@ -109,34 +111,7 @@ function toMegabytes(bytes) {
   return `${Math.round(mb * 10) / 10} Mb`;
 }
 
-function buildNode6IfNecessary() {
-  const fs = require('fs');
-  const path = require('path');
-
-  // if this package is installed from NPM, then it already has up-to-date node6
-  // folder.
-  if (!fs.existsSync(path.join('utils', 'node6-transform')))
-    return;
-  // if async/await is supported, then node6 is not needed.
-  if (supportsAsyncAwait())
-    return;
-  // Re-build node6/ folder.
-  logPolitely('Building Puppeteer for Node 6');
-  require(path.join(__dirname, 'utils', 'node6-transform'));
-}
-
-function supportsAsyncAwait() {
-  try {
-    new Function('async function test(){await 1}');
-  } catch (error) {
-    return false;
-  }
-  return true;
-}
-
 function generateProtocolTypesIfNecessary(updated) {
-  if (!supportsAsyncAwait())
-    return;
   const fs = require('fs');
   const path = require('path');
   if (!fs.existsSync(path.join(__dirname, 'utils', 'protocol-types-generator')))
