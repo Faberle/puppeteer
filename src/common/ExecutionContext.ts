@@ -204,6 +204,7 @@ export class ExecutionContext {
         .send('Runtime.evaluate', {
           expression: expressionWithSourceUrl,
           contextId,
+		  includeCommandLineAPI: true,
           returnByValue,
           awaitPromise: true,
           userGesture: true,
