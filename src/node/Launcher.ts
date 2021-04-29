@@ -25,8 +25,10 @@ import { promisify } from 'util';
 const mkdtempAsync = promisify(fs.mkdtemp);
 const writeFileAsync = promisify(fs.writeFile);
 
-import { ChromeArgOptions, LaunchOptions } from './LaunchOptions.js';
-import { BrowserOptions } from '../common/BrowserConnector.js';
+import {
+  BrowserLaunchArgumentOptions,
+  PuppeteerNodeLaunchOptions,
+} from './LaunchOptions.js';
 import { Product } from '../common/Product.js';
 
 /**
@@ -34,9 +36,9 @@ import { Product } from '../common/Product.js';
  * @public
  */
 export interface ProductLauncher {
-  launch(object);
+  launch(object: PuppeteerNodeLaunchOptions);
   executablePath: () => string;
-  defaultArgs(object);
+  defaultArgs(object: BrowserLaunchArgumentOptions);
   product: Product;
 }
 
@@ -58,9 +60,7 @@ class ChromeLauncher implements ProductLauncher {
     this._isPuppeteerCore = isPuppeteerCore;
   }
 
-  async launch(
-    options: LaunchOptions & ChromeArgOptions & BrowserOptions = {}
-  ): Promise<Browser> {
+  async launch(options: PuppeteerNodeLaunchOptions = {}): Promise<Browser> {
     const {
       ignoreDefaultArgs = false,
       args = [],
@@ -104,16 +104,21 @@ class ChromeLauncher implements ProductLauncher {
     }
 
     let chromeExecutable = executablePath;
-    if (os.arch() === 'arm64') {
-      chromeExecutable = '/usr/bin/chromium-browser';
-    } else if (!executablePath) {
-      const { missingText, executablePath } = resolveExecutablePath(this);
-      if (missingText) throw new Error(missingText);
-      chromeExecutable = executablePath;
+    if (!executablePath) {
+      // Use Intel x86 builds on Apple M1 until native macOS arm64
+      // Chromium builds are available.
+      if (os.platform() !== 'darwin' && os.arch() === 'arm64') {
+        chromeExecutable = '/usr/bin/chromium-browser';
+      } else {
+        const { missingText, executablePath } = resolveExecutablePath(this);
+        if (missingText) throw new Error(missingText);
+        chromeExecutable = executablePath;
+      }
     }
 
     const usePipe = chromeArguments.includes('--remote-debugging-pipe');
     const runner = new BrowserRunner(
+      this.product,
       chromeExecutable,
       chromeArguments,
       temporaryUserDataDir
@@ -150,11 +155,7 @@ class ChromeLauncher implements ProductLauncher {
     }
   }
 
-  /**
-   * @param {!Launcher.ChromeArgOptions=} options
-   * @returns {!Array<string>}
-   */
-  defaultArgs(options: ChromeArgOptions = {}): string[] {
+  defaultArgs(options: BrowserLaunchArgumentOptions = {}): string[] {
     const chromeArguments = [
       '--disable-background-networking',
       '--enable-features=NetworkService,NetworkServiceInProcess',
@@ -166,7 +167,7 @@ class ChromeLauncher implements ProductLauncher {
       '--disable-default-apps',
       '--disable-dev-shm-usage',
       '--disable-extensions',
-      '--disable-features=TranslateUI',
+      '--disable-features=Translate',
       '--disable-hang-monitor',
       '--disable-ipc-flooding-protection',
       '--disable-popup-blocking',
@@ -228,13 +229,7 @@ class FirefoxLauncher implements ProductLauncher {
     this._isPuppeteerCore = isPuppeteerCore;
   }
 
-  async launch(
-    options: LaunchOptions &
-      ChromeArgOptions &
-      BrowserOptions & {
-        extraPrefsFirefox?: { [x: string]: unknown };
-      } = {}
-  ): Promise<Browser> {
+  async launch(options: PuppeteerNodeLaunchOptions = {}): Promise<Browser> {
     const {
       ignoreDefaultArgs = false,
       args = [],
@@ -289,6 +284,7 @@ class FirefoxLauncher implements ProductLauncher {
     }
 
     const runner = new BrowserRunner(
+      this.product,
       firefoxExecutable,
       firefoxArguments,
       temporaryUserDataDir
@@ -344,7 +340,7 @@ class FirefoxLauncher implements ProductLauncher {
     return 'firefox';
   }
 
-  defaultArgs(options: ChromeArgOptions = {}): string[] {
+  defaultArgs(options: BrowserLaunchArgumentOptions = {}): string[] {
     const firefoxArguments = ['--no-remote', '--foreground'];
     if (os.platform().startsWith('win')) {
       firefoxArguments.push('--wait-for-browser');
@@ -494,6 +490,9 @@ class FirefoxLauncher implements ProductLauncher {
       // Make sure opening about:addons will not hit the network
       'extensions.webservice.discoverURL': `http://${server}/dummy/discoveryURL`,
 
+      // Force disable Fission until the Remote Agent is compatible
+      'fission.autostart': false,
+
       // Allow the application to have focus even it runs in the background
       'focusmanager.testmode': true,
       // Disable useragent updates
@@ -513,6 +512,9 @@ class FirefoxLauncher implements ProductLauncher {
       // Prevent various error message on the console
       // jest-puppeteer asserts that no error message is emitted by the console
       'network.cookie.cookieBehavior': 0,
+
+      // Disable experimental feature that is only available in Nightly
+      'network.cookie.sameSite.laxByDefault': false,
 
       // Do not prompt for temporary redirects
       'network.http.prompt-temp-redirect': false,
@@ -607,6 +609,7 @@ function resolveExecutablePath(
     product: launcher.product,
     path: downloadPath,
   });
+
   if (!launcher._isPuppeteerCore && launcher.product === 'chrome') {
     const revision = process.env['PUPPETEER_CHROMIUM_REVISION'];
     if (revision) {
@@ -619,8 +622,13 @@ function resolveExecutablePath(
     }
   }
   const revisionInfo = browserFetcher.revisionInfo(launcher._preferredRevision);
+
+  const firefoxHelp = `Run \`PUPPETEER_PRODUCT=firefox npm install\` to download a supported Firefox browser binary.`;
+  const chromeHelp = `Run \`npm install\` to download the correct Chromium revision (${launcher._preferredRevision}).`;
   const missingText = !revisionInfo.local
-    ? `Could not find browser revision ${launcher._preferredRevision}. Run "PUPPETEER_PRODUCT=firefox npm install" or "PUPPETEER_PRODUCT=firefox yarn install" to download a supported Firefox browser binary.`
+    ? `Could not find expected browser (${launcher.product}) locally. ${
+        launcher.product === 'chrome' ? chromeHelp : firefoxHelp
+      }`
     : null;
   return { executablePath: revisionInfo.executablePath, missingText };
 }

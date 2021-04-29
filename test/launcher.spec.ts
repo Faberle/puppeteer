@@ -22,7 +22,6 @@ import {
   getTestState,
   itFailsFirefox,
   itOnlyRegularInstall,
-  itFailsWindows,
 } from './mocha-utils'; // eslint-disable-line import/extensions
 import utils from './utils.js';
 import expect from 'expect';
@@ -339,7 +338,7 @@ describe('Launcher specs', function () {
         if (isChrome) expect(puppeteer.product).toBe('chrome');
         else if (isFirefox) expect(puppeteer.product).toBe('firefox');
       });
-      it('should work with no default arguments', async () => {
+      itFailsFirefox('should work with no default arguments', async () => {
         const { defaultBrowserOptions, puppeteer } = getTestState();
         const options = Object.assign({}, defaultBrowserOptions);
         options.ignoreDefaultArgs = true;
@@ -470,18 +469,17 @@ describe('Launcher specs', function () {
         ]);
       });
 
-      /* We think there's a bug in the FF Windows launcher, or some
-       * combo of that plus it running on CI, but it's hard to track down.
-       * See comment here: https://github.com/puppeteer/puppeteer/issues/5673#issuecomment-670141377.
-       */
-      itFailsWindows('should be able to launch Firefox', async function () {
-        this.timeout(FIREFOX_TIMEOUT);
-        const { puppeteer } = getTestState();
-        const browser = await puppeteer.launch({ product: 'firefox' });
-        const userAgent = await browser.userAgent();
-        await browser.close();
-        expect(userAgent).toContain('Firefox');
-      });
+      itOnlyRegularInstall(
+        'should be able to launch Firefox',
+        async function () {
+          this.timeout(FIREFOX_TIMEOUT);
+          const { puppeteer } = getTestState();
+          const browser = await puppeteer.launch({ product: 'firefox' });
+          const userAgent = await browser.userAgent();
+          await browser.close();
+          expect(userAgent).toContain('Firefox');
+        }
+      );
     });
 
     describe('Puppeteer.connect', function () {
@@ -589,6 +587,24 @@ describe('Launcher specs', function () {
           await browserOne.close();
         }
       );
+      it('should be able to reconnect', async () => {
+        const { puppeteer, server } = getTestState();
+        const browserOne = await puppeteer.launch();
+        const browserWSEndpoint = browserOne.wsEndpoint();
+        const pageOne = await browserOne.newPage();
+        await pageOne.goto(server.EMPTY_PAGE);
+        browserOne.disconnect();
+
+        const browserTwo = await puppeteer.connect({ browserWSEndpoint });
+        const pages = await browserTwo.pages();
+        const pageTwo = pages.find((page) => page.url() === server.EMPTY_PAGE);
+        await pageTwo.reload();
+        const bodyHandle = await pageTwo.waitForSelector('body', {
+          timeout: 10000,
+        });
+        await bodyHandle.dispose();
+        await browserTwo.close();
+      });
     });
     describe('Puppeteer.executablePath', function () {
       itOnlyRegularInstall('should work', async () => {
